@@ -1192,10 +1192,10 @@ bool matmul_amx_blocking_params_macro_t::set_blocking_parameters(
 
         // Collapse to a single K-chunk only when one thread owns the whole K
         // reduction (nthr_k_ == 1) and the heuristic split K into more than one
-        // chunk (best_k_v > 1). Restricted to int8 (GNR-calibrated). The
-        // postops-bound branch above leaves best_k_v == 1, so best_k_v > 1 also
-        // keeps these two paths mutually exclusive.
-        if (nthr_k_ == 1 && best_k_v > 1 && one_of(src_dt, s8, u8)) {
+        // chunk (best_k_v > 1). The postops-bound branch above leaves
+        // best_k_v == 1, so best_k_v > 1 also keeps these two paths mutually
+        // exclusive.
+        if (nthr_k_ == 1 && best_k_v > 1 && one_of(src_dt, s8, u8, bf16, f16)) {
             // Keep C resident in the AMX tiles across the whole K reduction
             // instead of chunking K, which forces a C read-modify-write
             // (tilestored/tileloadd of every C tile) at each chunk boundary
@@ -1218,7 +1218,7 @@ bool matmul_amx_blocking_params_macro_t::set_blocking_parameters(
             // exposed cost scales with aggregate concurrent demand ~
             // nthr_ * k_tiles_full (reduction depth x threads streaming B at
             // once); collapse wins while that product stays under the value
-            // below (measured cold on GNR, int8). At 32 threads this is
+            // below (measured cold on GNR). At 32 threads this is
             // k_tiles_full <= 96; fewer threads tolerate deeper reductions.
             constexpr dim_t max_load_concurrency = 32 * 96;
             if (k_tiles_full * c_tiles <= max_unrolled_tmuls

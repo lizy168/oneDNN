@@ -41,6 +41,14 @@ public:
         const stmt_t &body = builder.stmt();
         generate_from_ir(body);
     }
+
+    kernel_t(const config_t &cfg, const dsl::kernel::iface_t &iface,
+            const compute::range_t &local_range)
+        : ir_kernel_t(iface, cfg.options(), local_range,
+                {GENERATOR_NAME, GENERATOR_LINE}) {
+        ir_builder_t builder(cfg, iface);
+        generate_from_ir(builder.stmt());
+    }
 };
 
 } // namespace jit

@@ -170,16 +170,16 @@ bool ir_builder_t::try_build(const tile_t &iter_tile, const tile_t &loop_tile) {
     auto src_thr_view = src_view.create_sub_view(thr_tile_coord);
     auto dst_thr_view = dst_view.create_sub_view(thr_tile_coord);
 
-    auto src_buf = kernel_info_.arg_var(0);
-    auto dst_buf = kernel_info_.arg_var(1);
+    auto src_buf = iface_[0];
+    auto dst_buf = iface_[1];
 
     ir_context_t ir_ctx(cfg_.options(), init_cset);
     auto reg_buf = ir_ctx.create_tmp_var(
             dsl::type_t::byte(dsl::type::attr_t::ptr), "reg");
 
     std::vector<stmt_t> allocs;
-    for (int i = 0; i < kernel_info_.nargs(); i++) {
-        auto &var = kernel_info_.arg_var(i);
+    for (size_t i = 0; i < iface_.nargs(); i++) {
+        auto &var = iface_[i];
         if (!var.type().is_ptr()) continue;
         allocs.push_back(alloc_t::make(var, 0, alloc_kind_t::global));
     }
@@ -212,7 +212,7 @@ bool ir_builder_t::try_build(const tile_t &iter_tile, const tile_t &loop_tile) {
     if (has_post_ops) {
         post_op_view_mapper_t view_mapper(dst_view);
         post_op_context_t post_op_ctx(*attr_, cfg_.zp_cfg(), schedule,
-                kernel_info_, *dst_md_, *dst_md_, view_mapper);
+                *kernel_info_, *dst_md_, *dst_md_, view_mapper);
         write_stmt = create_epilogue_stmt(cfg_.options(), ir_ctx, schedule,
                 /*force_c_reorder=*/true, post_op_ctx, thr_tile_coord,
                 read_layout, dst_buf, reg_buf, write_buf_size);

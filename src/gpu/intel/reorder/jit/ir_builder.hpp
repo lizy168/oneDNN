@@ -33,7 +33,17 @@ class ir_builder_t : public intel::jit::ir_builder_t {
 public:
     ir_builder_t(const config_t &cfg, const kernel_info_t &kernel_info,
             const primitive_attr_t *attr, const memory_desc_t *dst_md)
-        : cfg_(cfg), kernel_info_(kernel_info), attr_(attr), dst_md_(dst_md) {
+        : cfg_(cfg)
+        , iface_(kernel_info.iface(""))
+        , kernel_info_(&kernel_info)
+        , attr_(attr)
+        , dst_md_(dst_md) {
+        build();
+    }
+
+    // Post-op-free path: the kernel depends only on the config and interface.
+    ir_builder_t(const config_t &cfg, const dsl::kernel::iface_t &iface)
+        : cfg_(cfg), iface_(iface) {
         build();
     }
 
@@ -44,9 +54,10 @@ private:
     bool try_build(const tile_t &iter_tile, const tile_t &loop_tile);
 
     const config_t &cfg_;
-    const kernel_info_t &kernel_info_;
-    const primitive_attr_t *attr_;
-    const memory_desc_t *dst_md_;
+    dsl::kernel::iface_t iface_;
+    const kernel_info_t *kernel_info_ = nullptr;
+    const primitive_attr_t *attr_ = nullptr;
+    const memory_desc_t *dst_md_ = nullptr;
 };
 
 } // namespace jit

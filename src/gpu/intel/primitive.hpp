@@ -99,14 +99,15 @@ struct primitive_t : public gpu::primitive_t {
     template <typename T>
     status_t create_kernels(impl::engine_t *engine,
             std::vector<compute::kernel_t> &kernels,
-            const std::vector<const char *> &kernel_names, const T &params) {
+            const std::vector<const char *> &kernel_names, const T &params,
+            bool register_kernel = true) {
         auto *intel_engine = utils::downcast<intel::engine_t *>(engine);
         if (cache_blob()) {
             CHECK(intel_engine->create_kernels_from_cache_blob(
                     cache_blob(), kernels, kernel_names));
             for (auto &k : kernels)
                 k.hash_dump("blob");
-            CHECK(register_kernels(kernels));
+            if (register_kernel) CHECK(register_kernels(kernels));
             return status::success;
         }
 
@@ -124,16 +125,18 @@ struct primitive_t : public gpu::primitive_t {
 
         for (auto &k : kernels)
             k.hash_dump("real");
-        CHECK(register_kernels(kernels));
+        if (register_kernel) CHECK(register_kernels(kernels));
 
         return status::success;
     }
 
     template <typename T>
     status_t create_kernel(impl::engine_t *engine, compute::kernel_t &kernel,
-            const char *kernel_name, const T &params) {
+            const char *kernel_name, const T &params,
+            bool register_kernel = true) {
         std::vector<compute::kernel_t> kernels(1);
-        VCHECK_KERNEL(create_kernels(engine, kernels, {kernel_name}, params),
+        VCHECK_KERNEL(create_kernels(engine, kernels, {kernel_name}, params,
+                              register_kernel),
                 VERBOSE_KERNEL_CREATION_FAIL, kernel_name);
         kernel = kernels[0];
         return status::success;

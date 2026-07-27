@@ -30,6 +30,7 @@
 #include "gpu/intel/logging.hpp"
 #include "gpu/intel/reorder/jit/config.hpp"
 #include "gpu/intel/reorder/jit/kernel.hpp"
+#include "gpu/intel/reorder/jit/kernel_desc.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -45,6 +46,23 @@ struct pd_data_t {
     std::vector<kernel_info_t> kernel_infos;
     std::shared_ptr<primitive_desc_t> zp_pd;
 };
+
+// Layouts repeat across problems, let the kernel cache serve the repeats.
+compute::kernel_t make_reorder_kernel(primitive_t *primitive,
+        impl::engine_t *engine, const dsl::kernel::options_t &options,
+        const layout_t &src, const layout_t &dst, const kernel_info_t &info) {
+    if (!reorder::jit::kernel_desc_t::is_supported(src, dst)) {
+        reorder::jit::config_t cfg(options, src, dst);
+        return make_kernel<reorder::jit::kernel_t>(primitive,
+                /*register_kernel=*/false, engine, cfg, "conv_reorder", info);
+    }
+    reorder::jit::kernel_desc_t desc(options, src, dst, "conv_reorder");
+    compute::kernel_t kernel;
+    if (desc.create_kernel(kernel, primitive, engine, /*register_kernel=*/false)
+            != status::success)
+        return compute::kernel_t();
+    return kernel;
+}
 
 #define CONV_CHECK(_st) \
     do { \
@@ -189,26 +207,19 @@ public:
                             break;
                         }
                         case kernel_id_t::pre_reorder: {
-                            reorder::jit::config_t reorder_cfg(cfg.options(),
+                            tmp_kernels.push_back(make_reorder_kernel(primitive,
+                                    engine, cfg.options(),
                                     tensor_cfg.user_layout(info.arg_name(1)),
-                                    tensor_cfg.compute_layout(
-                                            info.arg_name(1)));
-                            tmp_kernels.push_back(
-                                    make_kernel<reorder::jit::kernel_t>(
-                                            primitive,
-                                            /*register_kernel=*/false, engine,
-                                            reorder_cfg, "conv_reorder", info));
+                                    tensor_cfg.compute_layout(info.arg_name(1)),
+                                    info));
                             break;
                         }
                         case kernel_id_t::post_reorder: {
-                            reorder::jit::config_t reorder_cfg(cfg.options(),
+                            tmp_kernels.push_back(make_reorder_kernel(primitive,
+                                    engine, cfg.options(),
                                     tensor_cfg.compute_layout(info.arg_name(0)),
-                                    tensor_cfg.user_layout(info.arg_name(0)));
-                            tmp_kernels.push_back(
-                                    make_kernel<reorder::jit::kernel_t>(
-                                            primitive,
-                                            /*register_kernel=*/false, engine,
-                                            reorder_cfg, "conv_reorder", info));
+                                    tensor_cfg.user_layout(info.arg_name(0)),
+                                    info));
                             break;
                         }
                         case kernel_id_t::zero_out:

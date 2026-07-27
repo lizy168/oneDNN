@@ -823,7 +823,7 @@ public:
     }
 
 private:
-    object_map_t<expr_t, std::vector<relation_t>> relations_;
+    const object_map_t<expr_t, std::vector<relation_t>> &relations_;
 };
 
 // TODO: Add integers check (only integers can be constrained).
@@ -835,11 +835,19 @@ public:
 
     void add_constraint(const expr_t &e);
 
-    bool can_prove(const expr_t &e, bool try_simplify = true) const {
-        auto ret = can_prove_impl(e, /*do_simplify=*/false);
-        if (ret || !try_simplify) return ret;
+    bool is_empty() const {
+        return relations_.empty() && modulus_infos_.empty();
+    }
 
-        return can_prove_impl(e, /*do_simplify=*/true);
+    bool can_prove(const expr_t &e, bool try_simplify = true) const {
+        auto &cache = try_simplify ? can_prove_cache_ : can_prove_fast_cache_;
+        auto it = cache.find(e);
+        if (it != cache.end()) return it->second;
+
+        auto ret = can_prove_impl(e, /*do_simplify=*/false);
+        if (!ret && try_simplify) ret = can_prove_impl(e, /*do_simplify=*/true);
+        cache.emplace(e, ret);
+        return ret;
     }
 
     bool is_single_value(const expr_t &e, expr_t &value) const;
@@ -947,6 +955,9 @@ private:
 
     object_map_t<expr_t, std::vector<relation_t>> relations_;
     object_map_t<expr_t, std::vector<modulus_info_t>> modulus_infos_;
+    // Memo for can_prove(), invalidated by add_constraint().
+    mutable object_eq_map_t<expr_t, bool> can_prove_cache_;
+    mutable object_eq_map_t<expr_t, bool> can_prove_fast_cache_;
 };
 
 // Pre-defined functions.

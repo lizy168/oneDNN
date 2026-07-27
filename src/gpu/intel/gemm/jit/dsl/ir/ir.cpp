@@ -842,6 +842,8 @@ void ir_context_t::add_constraint(const expr_t &e) {
 }
 
 void constraint_set_t::add_constraint(const expr_t &e) {
+    can_prove_cache_.clear();
+    can_prove_fast_cache_.clear();
     auto *shuffle = e.as_ptr<shuffle_t>();
     if (shuffle) {
         if (shuffle->is_broadcast()) add_constraint(shuffle->vec[0]);
